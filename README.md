@@ -29,6 +29,29 @@ $env:DATABASE_URL = "postgres://postgres:YOURPASSWORD@localhost:5432/myrxlis_dev
 $env:TEST_DATABASE_URL = "postgres://postgres:YOURPASSWORD@localhost:5432/myrxlis_test"
 ```
 
+## LIS Lite API
+
+All routes sit under `/labs/:labId` and, until real login lands, name the acting
+staff member in an `x-staff-id` header.
+
+| Method | Path | Who |
+| --- | --- | --- |
+| POST | `/patients` | receptionist, admin |
+| GET | `/patients?q=` | any staff |
+| GET | `/tests` | any staff |
+| POST | `/orders` | receptionist, admin |
+| GET | `/orders/:orderId` | any staff |
+| POST | `/orders/:orderId/payments` | receptionist, admin |
+| POST | `/specimens/:specimenId/collect` | receptionist, technologist, admin |
+| POST | `/specimens/:specimenId/receive` | technologist, pathologist, admin |
+| PUT | `/order-tests/:orderTestId/results` | technologist, pathologist |
+| POST | `/order-tests/:orderTestId/validate` | pathologist |
+| POST | `/order-tests/:orderTestId/reopen` | pathologist |
+| POST | `/order-tests/:orderTestId/cancel` | receptionist, pathologist, admin |
+| POST | `/orders/:orderId/release` | pathologist |
+| GET | `/reports/:reportId` | any staff |
+| GET | `/summary?date=YYYY-MM-DD` | any staff |
+
 ## Tests
 
 ```bash
