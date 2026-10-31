@@ -1,6 +1,7 @@
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Db } from './db.js';
 import { HttpError } from './lis/errors.js';
+import { dxRoutes } from './dx/routes.js';
 import { lisRoutes } from './lis/routes.js';
 
 export interface AppOptions {
@@ -12,7 +13,7 @@ export interface AppOptions {
 const PG_CONFLICT = new Set(['23505', '23514', '23503', '23P01']);
 
 export function buildApp({ db, logger = false }: AppOptions): FastifyInstance {
-  const app = Fastify({ logger });
+  const app = Fastify({ logger, ajv: { customOptions: { allowUnionTypes: true } } });
 
   app.setErrorHandler((err: FastifyError & { code?: string }, req, reply) => {
     if (err instanceof HttpError) {
@@ -41,6 +42,7 @@ export function buildApp({ db, logger = false }: AppOptions): FastifyInstance {
   });
 
   app.register(lisRoutes, { db });
+  app.register(dxRoutes, { db });
 
   return app;
 }

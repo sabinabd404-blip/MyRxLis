@@ -29,6 +29,11 @@ $env:DATABASE_URL = "postgres://postgres:YOURPASSWORD@localhost:5432/myrxlis_dev
 $env:TEST_DATABASE_URL = "postgres://postgres:YOURPASSWORD@localhost:5432/myrxlis_test"
 ```
 
+## MyRx DX exchange API
+
+How MyRx EMR sends orders and receives results, and how labs work their queue:
+see [docs/DX_API.md](docs/DX_API.md).
+
 ## LIS Lite API
 
 All routes sit under `/labs/:labId` and, until real login lands, name the acting
