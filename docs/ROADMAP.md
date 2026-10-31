@@ -14,5 +14,7 @@
 - [x] Phase 0: MyRx DX schema imported (migrations 0002–0005) with its tests ported
 - [x] Phase 1: LIS Lite data model (migration 0001) with database tests
 - [x] Phase 1: LIS Lite API (registration, orders, billing, specimens, results, validation, release, daily summary)
-- [ ] Phase 2 (moved up): DX result-delivery path: EMR order intake, lab work queue, result intake, EMR result feed
+- [x] Phase 2 (moved up): DX result-delivery path: EMR order intake, lab work queue, result intake, EMR result feed
+- [ ] Bridge: LIS Lite releases flow into DX automatically
+- [ ] Adapter for labs with their own LIS (BIRDEM-style pull API)
 - [ ] Phase 1: real login, PDF report, screens
