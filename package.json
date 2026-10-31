@@ -1,0 +1,30 @@
+{
+  "name": "myrxlis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MyRx LIS and MyRx Diagnostic Exchange (DX): laboratory information system and diagnostic-order exchange for DHESTRA HealthTech",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:reset": "tsx scripts/migrate.ts --reset",
+    "db:seed": "tsx scripts/seed.ts",
+    "test": "tsx scripts/migrate.ts --reset --test && tsx --test --test-concurrency=1 \"test/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "fastify": "^5.12.7",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.15.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
