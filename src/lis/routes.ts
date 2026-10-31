@@ -1,15 +1,15 @@
 /**
  * LIS Lite HTTP API, mounted under /labs/:labId.
  *
- * Authentication is a placeholder for now: each request names the acting
- * staff member in the `x-staff-id` header, and that staff member must belong
- * to the lab in the URL. Real login (passwords and sessions) replaces this
- * before any pilot.
+ * Staff sign in with POST /labs/:labId/auth/login and send the session token
+ * as `Authorization: Bearer <token>` on every other request. A session only
+ * works for the lab it was issued in.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { withTransaction, type Db } from '../db.js';
-import { forbidden } from './errors.js';
+import * as auth from '../auth/lis-auth.js';
+import { bearerToken, PASSWORD_MAX } from '../auth/crypto.js';
 import * as bridge from '../bridge/lis-dx.js';
 import * as lis from './service.js';
 
@@ -20,16 +20,12 @@ const idParams = (name: string) =>
 
 type LabReq = FastifyRequest<{ Params: { labId: string } }>;
 
-export async function lisRoutes(app: FastifyInstance, { db }: { db: Db }) {
-  async function staffFor(req: FastifyRequest): Promise<lis.Staff> {
+export async function lisRoutes(app: FastifyInstance, { db, policy }: { db: Db; policy: auth.AuthPolicy }) {
+  const meta = (req: FastifyRequest): auth.RequestMeta => ({ ip: req.ip, userAgent: req.headers['user-agent'] });
+
+  async function staffFor(req: FastifyRequest) {
     const { labId } = req.params as { labId: string };
-    const staffId = req.headers['x-staff-id'];
-    if (typeof staffId !== 'string' || !/^[0-9a-f-]{36}$/i.test(staffId)) {
-      throw forbidden('Missing or invalid x-staff-id header');
-    }
-    const staff = await lis.getStaff(db, labId, staffId);
-    if (!staff) throw forbidden('Unknown staff member for this lab');
-    return staff;
+    return auth.authenticate(db, labId, bearerToken(req.headers.authorization));
   }
 
   /** Run a write as the requesting staff member, in one transaction, recorded in the audit trail. */
@@ -37,6 +33,58 @@ export async function lisRoutes(app: FastifyInstance, { db }: { db: Db }) {
     const staff = await staffFor(req);
     return withTransaction(db, staff.id, (c) => fn(c, staff));
   }
+
+  // --- Sign-in -------------------------------------------------------------
+  const password = { type: 'string', minLength: 1, maxLength: PASSWORD_MAX } as const;
+
+  app.post('/labs/:labId/auth/login', {
+    schema: {
+      params: labParams,
+      body: {
+        type: 'object', required: ['username', 'password'], additionalProperties: false,
+        properties: { username: { type: 'string', minLength: 1, maxLength: 100 }, password },
+      },
+    },
+  }, async (req) => {
+    const { labId } = req.params as { labId: string };
+    const { username, password: pw } = req.body as { username: string; password: string };
+    return auth.login(db, labId, username, pw, policy, meta(req));
+  });
+
+  app.post('/labs/:labId/auth/logout', { schema: { params: labParams } }, async (req, reply) => {
+    await auth.logout(db, await staffFor(req), meta(req));
+    return reply.code(204).send();
+  });
+
+  app.get('/labs/:labId/auth/me', { schema: { params: labParams } }, async (req) => {
+    const { session_id: _s, ...staff } = await staffFor(req);
+    return staff;
+  });
+
+  app.put('/labs/:labId/auth/password', {
+    schema: {
+      params: labParams,
+      body: {
+        type: 'object', required: ['current_password', 'new_password'], additionalProperties: false,
+        properties: { current_password: password, new_password: password },
+      },
+    },
+  }, async (req, reply) => {
+    const { current_password, new_password } = req.body as { current_password: string; new_password: string };
+    await auth.changeOwnPassword(db, await staffFor(req), current_password, new_password, meta(req));
+    return reply.code(204).send();
+  });
+
+  app.put('/labs/:labId/staff/:staffId/password', {
+    schema: {
+      params: idParams('staffId'),
+      body: { type: 'object', required: ['new_password'], additionalProperties: false, properties: { new_password: password } },
+    },
+  }, async (req, reply) => {
+    const { staffId } = req.params as { staffId: string };
+    await auth.setStaffPassword(db, await staffFor(req), staffId, (req.body as { new_password: string }).new_password, meta(req));
+    return reply.code(204).send();
+  });
 
   // --- Patients -----------------------------------------------------------
   app.post('/labs/:labId/patients', {

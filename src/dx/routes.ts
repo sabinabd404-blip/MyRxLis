@@ -3,13 +3,15 @@
  *
  * Callers act for one organisation (/dx/orgs/:orgId/...): an EMR client acts
  * for the clinic or chamber that places orders, a lab acts for itself.
- * Authentication is a placeholder: the `x-dx-user` header names the user, who
- * must be an active member of that organisation. Signed service credentials
- * replace this before any real lab is connected.
+ * Every call carries an API key (`Authorization: Bearer mrxk_...`) issued to a
+ * user in one organisation. The key only works for that organisation's URLs,
+ * and acts with that user's current roles there.
  */
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { withTransaction, type Db } from '../db.js';
+import { bearerToken } from '../auth/crypto.js';
+import * as keys from '../auth/dx-auth.js';
 import { forbidden } from '../lis/errors.js';
 import * as dx from './service.js';
 
@@ -30,9 +32,9 @@ const release = {
 export async function dxRoutes(app: FastifyInstance, { db }: { db: Db }) {
   async function actorFor(req: FastifyRequest): Promise<dx.DxActor> {
     const { orgId } = req.params as { orgId: string };
-    const userId = req.headers['x-dx-user'];
-    if (typeof userId !== 'string' || !/^[0-9a-f-]{36}$/i.test(userId)) throw forbidden('Missing or invalid x-dx-user header');
-    const actor = await dx.getActor(db, userId, orgId);
+    const principal = await keys.authenticateKey(db, bearerToken(req.headers.authorization), req.ip);
+    keys.requireSameOrg(principal, orgId);
+    const actor = await dx.getActor(db, principal.userId, orgId);
     if (!actor) throw forbidden('Not an active member of this organisation');
     return actor;
   }
@@ -51,7 +53,42 @@ export async function dxRoutes(app: FastifyInstance, { db }: { db: Db }) {
   // Directory: which labs offer an investigation
   app.get('/dx/offers', {
     schema: { querystring: { type: 'object', required: ['code'], properties: { code: { type: 'string' } } } },
-  }, async (req) => dx.findOffers(db, (req.query as { code: string }).code));
+  }, async (req) => {
+    await keys.authenticateKey(db, bearerToken(req.headers.authorization), req.ip);
+    return dx.findOffers(db, (req.query as { code: string }).code);
+  });
+
+  // ---- API keys (organisation admins) -----------------------------------
+  async function adminFor(req: FastifyRequest) {
+    const actor = await actorFor(req);
+    if (!actor.roles.includes('org_admin')) throw forbidden('Only an organisation admin can manage API keys');
+    return actor;
+  }
+
+  app.get('/dx/orgs/:orgId/api-keys', { schema: { params: params() } }, async (req) => {
+    const admin = await adminFor(req);
+    return keys.listKeys(db, admin.organisationId);
+  });
+
+  app.post('/dx/orgs/:orgId/api-keys', {
+    schema: {
+      params: params(),
+      body: {
+        type: 'object', required: ['user_id', 'name'], additionalProperties: false,
+        properties: { user_id: uuid, name: { type: 'string', minLength: 1, maxLength: 100 }, expires_at: { type: 'string', format: 'date-time' } },
+      },
+    },
+  }, async (req, reply) => {
+    const admin = await adminFor(req);
+    const key = await withTransaction(db, admin.userId,
+      (c) => keys.createKey(c, admin.organisationId, req.body as keys.NewKeyInput, admin.userId, req.ip));
+    return reply.code(201).send(key);
+  });
+
+  app.post('/dx/orgs/:orgId/api-keys/:keyId/revoke', { schema: { params: params('keyId') } }, async (req) => {
+    const admin = await adminFor(req);
+    return keys.revokeKey(db, admin.organisationId, (req.params as { keyId: string }).keyId, admin.userId, req.ip);
+  });
 
   // ---- EMR side ----------------------------------------------------------
   app.post('/dx/orgs/:orgId/orders', {

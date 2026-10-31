@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
 import { pool } from '../helpers/db.js';
 import { createDxWorld, type DxWorld } from '../helpers/dxworld.js';
+import { dxAuth, staffAuth } from '../helpers/auth.js';
 import { createTestLab, type TestLab } from '../helpers/lab.js';
 
 let app: FastifyInstance;
@@ -28,7 +29,7 @@ async function connect(lab: TestLab, w: DxWorld) {
 
 function lisApi(lab: TestLab, staffId: string) {
   const call = async (method: 'GET' | 'POST' | 'PUT', url: string, payload?: object) => {
-    const res = await app.inject({ method, url: `/labs/${lab.labId}${url}`, payload, headers: { 'x-staff-id': staffId } });
+    const res = await app.inject({ method, url: `/labs/${lab.labId}${url}`, payload, headers: await staffAuth(lab.labId, staffId) });
     return { status: res.statusCode, body: res.json() };
   };
   return { get: (u: string) => call('GET', u), post: (u: string, b: object = {}) => call('POST', u, b), put: (u: string, b: object) => call('PUT', u, b) };
@@ -36,7 +37,7 @@ function lisApi(lab: TestLab, staffId: string) {
 
 function emrApi(w: DxWorld) {
   const call = async (method: 'GET' | 'POST', url: string, payload?: object) => {
-    const res = await app.inject({ method, url: `/dx/orgs/${w.clinic}${url}`, payload, headers: { 'x-dx-user': w.clinician } });
+    const res = await app.inject({ method, url: `/dx/orgs/${w.clinic}${url}`, payload, headers: await dxAuth(w.clinician) });
     return { status: res.statusCode, body: res.json() };
   };
   return { get: (u: string) => call('GET', u), post: (u: string, b: object) => call('POST', u, b) };

@@ -7,16 +7,19 @@ import { lisRoutes } from './lis/routes.js';
 export interface AppOptions {
   db: Db;
   logger?: boolean;
+  /** Staff session length in hours (default 12). */
+  sessionHours?: number;
 }
 
 // PostgreSQL error codes raised by our constraints and triggers.
 const PG_CONFLICT = new Set(['23505', '23514', '23503', '23P01']);
 
-export function buildApp({ db, logger = false }: AppOptions): FastifyInstance {
+export function buildApp({ db, logger = false, sessionHours = 12 }: AppOptions): FastifyInstance {
   const app = Fastify({ logger, ajv: { customOptions: { allowUnionTypes: true } } });
 
   app.setErrorHandler((err: FastifyError & { code?: string }, req, reply) => {
     if (err instanceof HttpError) {
+      if (err.statusCode === 401) reply.header('www-authenticate', 'Bearer');
       return reply.code(err.statusCode).send({ error: err.message });
     }
     if (err.validation) {
@@ -41,7 +44,7 @@ export function buildApp({ db, logger = false }: AppOptions): FastifyInstance {
     }
   });
 
-  app.register(lisRoutes, { db });
+  app.register(lisRoutes, { db, policy: { sessionHours } });
   app.register(dxRoutes, { db });
 
   return app;
