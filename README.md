@@ -56,6 +56,11 @@ staff member in an `x-staff-id` header.
 | POST | `/orders/:orderId/release` | pathologist |
 | GET | `/reports/:reportId` | any staff |
 | GET | `/summary?date=YYYY-MM-DD` | any staff |
+| GET | `/dx/inbox` | any staff (lab connected to DX) |
+| POST | `/dx/import` | receptionist, admin |
+
+For a lab connected to MyRx DX (`lis.labs.dx_organisation_id`), releasing a report sends
+the results of DX orders back to DX automatically, and paying a bill passes the release on.
 
 ## Tests
 

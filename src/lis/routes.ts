@@ -10,6 +10,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import { withTransaction, type Db } from '../db.js';
 import { forbidden } from './errors.js';
+import * as bridge from '../bridge/lis-dx.js';
 import * as lis from './service.js';
 
 const uuid = { type: 'string', format: 'uuid' } as const;
@@ -109,7 +110,12 @@ export async function lisRoutes(app: FastifyInstance, { db }: { db: Db }) {
     },
   }, async (req, reply) => {
     const { orderId } = req.params as { orderId: string };
-    const result = await write(req, (c, s) => lis.recordPayment(c, s, orderId, req.body as lis.PaymentInput));
+    const result = await write(req, async (c, s) => {
+      const r = await lis.recordPayment(c, s, orderId, req.body as lis.PaymentInput);
+      // Reports authorised by this payment become available in MyRx DX too.
+      const dx_decisions_updated = r.reports_authorised ? await bridge.syncReleaseDecisions(c, s.lab_id, orderId) : 0;
+      return { ...r, dx_decisions_updated };
+    });
     return reply.code(201).send(result);
   });
 
@@ -124,7 +130,12 @@ export async function lisRoutes(app: FastifyInstance, { db }: { db: Db }) {
   }, async (req, reply) => {
     const { orderId } = req.params as { orderId: string };
     const body = (req.body ?? {}) as { amendment_reason?: string };
-    const report = await write(req, (c, s) => lis.releaseReport(c, s, orderId, body));
+    const report = await write(req, async (c, s) => {
+      const r = await lis.releaseReport(c, s, orderId, body);
+      // Results for MyRx DX orders go back to DX in the same transaction.
+      const dx_results_sent = await bridge.pushRelease(c, s.lab_id, r);
+      return { ...r, dx_results_sent };
+    });
     return reply.code(201).send(report);
   });
 
@@ -180,6 +191,41 @@ export async function lisRoutes(app: FastifyInstance, { db }: { db: Db }) {
   }, async (req) => {
     const { orderTestId } = req.params as { orderTestId: string };
     return write(req, (c, s) => lis.cancelTest(c, s, orderTestId, (req.body as { reason: string }).reason));
+  });
+
+  // --- MyRx DX inbox -----------------------------------------------------
+  app.get('/labs/:labId/dx/inbox', { schema: { params: labParams } }, async (req) => {
+    const staff = await staffFor(req);
+    return bridge.inbox(db, staff);
+  });
+
+  app.post('/labs/:labId/dx/import', {
+    schema: {
+      params: labParams,
+      body: {
+        type: 'object', required: ['assignment_ids'], additionalProperties: false,
+        properties: {
+          assignment_ids: { type: 'array', minItems: 1, items: uuid },
+          patient_id: uuid,
+          patient: {
+            type: 'object', required: ['full_name', 'sex'], additionalProperties: false,
+            properties: {
+              full_name: { type: 'string', minLength: 1 }, full_name_bn: { type: 'string' },
+              sex: { enum: ['male', 'female', 'other', 'unknown'] }, date_of_birth: { type: 'string', format: 'date' },
+              phone: { type: 'string' }, address: { type: 'string' },
+            },
+          },
+          age: {
+            type: 'object', additionalProperties: false,
+            properties: { years: { type: 'number', minimum: 0 }, months: { type: 'number', minimum: 0 }, days: { type: 'number', minimum: 0 } },
+          },
+          referring_doctor_id: uuid,
+        },
+      },
+    },
+  }, async (req, reply) => {
+    const order = await write(req, (c, s) => bridge.importAssignments(c, s, req.body as bridge.ImportInput));
+    return reply.code(201).send(order);
   });
 
   // --- Reports and summary ------------------------------------------------

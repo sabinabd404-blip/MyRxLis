@@ -450,13 +450,14 @@ export async function releaseReport(
     `SELECT id, version FROM lis.reports WHERE order_id = $1 AND released_at IS NOT NULL ORDER BY version DESC LIMIT 1`,
     [orderId]);
   // A test that was in a previous report and is being released again was corrected.
-  let corrected = false;
+  let correctedIds: string[] = [];
   if (prev) {
-    const { rows: [x] } = await c.query(
-      `SELECT EXISTS (SELECT 1 FROM lis.report_items ri WHERE ri.report_id = $1 AND ri.order_test_id = ANY($2::uuid[])) AS c`,
+    const { rows } = await c.query<{ order_test_id: string }>(
+      `SELECT order_test_id FROM lis.report_items WHERE report_id = $1 AND order_test_id = ANY($2::uuid[])`,
       [prev.id, toRelease.map((t) => t.id)]);
-    corrected = x.c;
+    correctedIds = rows.map((r) => r.order_test_id);
   }
+  const corrected = correctedIds.length > 0;
   if (corrected && !opts.amendment_reason?.trim()) {
     throw badRequest('This release corrects a previously released result; give an amendment reason');
   }
@@ -486,7 +487,12 @@ export async function releaseReport(
       [report.id, orderId, t.id]);
   }
   await c.query('UPDATE lis.reports SET released_by = $2, released_at = now() WHERE id = $1', [report.id, staff.id]);
-  return getReport(c, labId, report.id);
+  return {
+    ...(await getReport(c, labId, report.id)),
+    /** Tests released for the first time or re-released after correction in this release. */
+    released_now: toRelease.map((t) => t.id),
+    corrected: correctedIds,
+  };
 }
 
 async function distributionFor(c: Q, labId: string, orderId: string) {
