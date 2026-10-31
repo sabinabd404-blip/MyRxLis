@@ -14,6 +14,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:reset": "tsx scripts/migrate.ts --reset",
     "db:seed": "tsx scripts/seed.ts",
+    "auth": "tsx scripts/auth.ts",
     "test": "tsx scripts/migrate.ts --reset --test && tsx --test --test-concurrency=1 \"test/**/*.test.ts\"",
     "check": "npm run typecheck && npm test"
   },

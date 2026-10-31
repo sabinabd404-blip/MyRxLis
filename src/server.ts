@@ -4,7 +4,7 @@ import { createPool } from './db.js';
 
 const config = loadConfig();
 const db = createPool(config.databaseUrl);
-const app = buildApp({ db, logger: true });
+const app = buildApp({ db, logger: true, sessionHours: config.sessionHours });
 
 const shutdown = async () => {
   await app.close();

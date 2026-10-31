@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
 import { pool } from '../helpers/db.js';
+import { dxAuth } from '../helpers/auth.js';
 import { createDxWorld, type DxWorld } from '../helpers/dxworld.js';
 
 let app: FastifyInstance;
@@ -11,7 +12,7 @@ after(() => app.close());
 
 function as(orgId: string, userId: string) {
   const call = async (method: 'GET' | 'POST', url: string, payload?: object) => {
-    const res = await app.inject({ method, url: `/dx/orgs/${orgId}${url}`, payload, headers: { 'x-dx-user': userId } });
+    const res = await app.inject({ method, url: `/dx/orgs/${orgId}${url}`, payload, headers: await dxAuth(userId) });
     return { status: res.statusCode, body: res.json() };
   };
   return { get: (url: string) => call('GET', url), post: (url: string, body: object = {}) => call('POST', url, body) };
@@ -57,7 +58,7 @@ test('one order, two labs, results back to the EMR through the feed', async () =
   assert.equal(again.body.id, created.body.id);
 
   // 2. The patient picks lab B near home for creatinine.
-  const offers = await app.inject({ method: 'GET', url: `/dx/offers?code=CREA-${w.tag}` });
+  const offers = await app.inject({ method: 'GET', url: `/dx/offers?code=CREA-${w.tag}`, headers: await dxAuth(w.clinician) });
   assert.deepEqual(offers.json().map((o: { lab: string }) => o.lab), [`LABB-${w.tag}`, `LABA-${w.tag}`], 'cheapest first');
   assert.equal((await emr.post(`/orders/${created.body.id}/items/${gluItem.id}/assign`, { lab_service_offer_id: w.offerBGlu })).status, 409,
     'an investigation already with a lab cannot be sent to a second one');

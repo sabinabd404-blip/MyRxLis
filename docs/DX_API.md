@@ -4,9 +4,13 @@ DX is how an investigation order gets from MyRx EMR to one or more labs, and how
 their results get back into the patient's record. Every call acts for one
 organisation: `/dx/orgs/:orgId/...`.
 
-> Authentication is a placeholder: send `x-dx-user: <user id>`. That user must be an
-> active member of the organisation in the URL. Signed service credentials replace this
-> before a real lab is connected.
+> Every call sends an API key: `Authorization: Bearer mrxk_...`. A key is issued to one
+> user in one organisation (normally an `integration_service` user), works only for that
+> organisation's URLs, and acts with that user's current roles. A missing, unknown,
+> revoked or expired key gets 401; a key used on another organisation's URL gets 403.
+> Keys are shown once when created. Organisation admins manage them with
+> `GET/POST /dx/orgs/:orgId/api-keys` and `POST /dx/orgs/:orgId/api-keys/:keyId/revoke`;
+> the first key comes from `npm run auth -- create-api-key` (see the README).
 
 ## The flow
 

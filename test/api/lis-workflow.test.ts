@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
 import { pool } from '../helpers/db.js';
+import { staffAuth } from '../helpers/auth.js';
 import { createTestLab, type TestLab } from '../helpers/lab.js';
 
 let app: FastifyInstance;
@@ -13,7 +14,7 @@ function api(lab: TestLab, staffId: string) {
   const call = async (method: 'GET' | 'POST' | 'PUT', url: string, payload?: object) => {
     const res = await app.inject({
       method, url: `/labs/${lab.labId}${url}`, payload,
-      headers: { 'x-staff-id': staffId },
+      headers: await staffAuth(lab.labId, staffId),
     });
     return { status: res.statusCode, body: res.json() };
   };
@@ -162,8 +163,9 @@ test("one lab's staff cannot see or change another lab's orders", async () => {
   const labB = await createTestLab();
   const { order } = await registerAndOrder(labA);
 
-  // Lab B staff using lab A's URL are not recognised.
-  const viaA = await app.inject({ method: 'GET', url: `/labs/${labA.labId}/orders/${order.id}`, headers: { 'x-staff-id': labB.reception } });
+  // A lab B session does not work on lab A's URLs.
+  const viaA = await app.inject({ method: 'GET', url: `/labs/${labA.labId}/orders/${order.id}`,
+    headers: await staffAuth(labB.labId, labB.reception) });
   assert.equal(viaA.statusCode, 403);
 
   // Lab B staff using their own lab URL cannot find lab A's order.
@@ -171,10 +173,11 @@ test("one lab's staff cannot see or change another lab's orders", async () => {
   assert.equal((await api(labB, labB.reception).post(`/orders/${order.id}/payments`, { amount: 10, method: 'cash' })).status, 404);
 });
 
-test('requests without a staff header are refused, and bad input is a 400', async () => {
+test('requests without a session are refused, and bad input is a 400', async () => {
   const lab = await createTestLab();
   const res = await app.inject({ method: 'GET', url: `/labs/${lab.labId}/tests` });
-  assert.equal(res.statusCode, 403);
+  assert.equal(res.statusCode, 401);
+  assert.equal(res.headers['www-authenticate'], 'Bearer');
   const desk = api(lab, lab.reception);
   assert.equal((await desk.post('/patients', { full_name: 'X' })).status, 400);
   assert.equal((await desk.post('/patients', { full_name: 'X', sex: 'female' })).status, 201);

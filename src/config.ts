@@ -2,6 +2,8 @@ export interface Config {
   databaseUrl: string;
   testDatabaseUrl: string;
   port: number;
+  /** How long a staff sign-in lasts (one lab shift by default). */
+  sessionHours: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -9,5 +11,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     databaseUrl: env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/myrxlis_dev',
     testDatabaseUrl: env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/myrxlis_test',
     port: Number(env.PORT ?? 3000),
+    sessionHours: Number(env.SESSION_HOURS ?? 12),
   };
 }

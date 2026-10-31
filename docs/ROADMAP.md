@@ -17,4 +17,5 @@
 - [x] Phase 2 (moved up): DX result-delivery path: EMR order intake, lab work queue, result intake, EMR result feed
 - [x] Bridge: DX orders appear in the LIS Lite inbox; LIS releases and payment-based authorisations flow back to DX automatically
 - [ ] Adapter for labs with their own LIS (BIRDEM-style pull API)
-- [ ] Phase 1: real login, PDF report, screens
+- [x] Real login: staff passwords and sessions with lock-out; DX API keys for the EMR and lab systems
+- [ ] Phase 1: PDF report, screens
