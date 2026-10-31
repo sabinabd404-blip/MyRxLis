@@ -48,6 +48,11 @@ and flag. DX does not change them.
 
 ## For labs
 
+Labs running MyRx LIS Lite do not call these directly: their DX work appears in the LIS
+inbox (`GET /labs/:labId/dx/inbox`, `POST /labs/:labId/dx/import`), and releasing a report
+in the LIS sends the results to DX automatically. Labs with their own LIS use the calls below.
+
+
 | Call | What it does |
 | --- | --- |
 | `GET /dx/orgs/:labId/work` | Your work queue: only investigations assigned to your lab, urgent first, with the patient's identity reference and your local test code. |
