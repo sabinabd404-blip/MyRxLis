@@ -11,6 +11,6 @@
 ## Status
 
 - [x] Phase 0: repo, migration runner, CI, API skeleton
+- [x] Phase 0: MyRx DX schema imported (migrations 0002–0005) with its tests ported
 - [x] Phase 1: LIS Lite data model (migration 0001) with database tests
-- [ ] Phase 0: import the MyRx DX schema and its tests
 - [ ] Phase 1: LIS Lite API and screens

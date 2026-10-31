@@ -18,7 +18,7 @@ LIS tables live in the `lis` schema, DX tables in `public`.
 npm install
 cp .env.example .env        # then edit DATABASE_URL / TEST_DATABASE_URL
 npm run db:reset            # create the dev database and apply migrations
-npm run db:seed             # load a demo lab, catalogue and patients (synthetic)
+npm run db:seed             # load synthetic LIS and DX demo data
 npm run dev                 # API on http://localhost:3000 (GET /health)
 ```
 
@@ -44,10 +44,11 @@ that each integrity rule rejects bad data for the right reason.
 ```
 db/migrations/   numbered SQL migrations (never edit one after it is applied)
 db/seeds/        synthetic demo data
-db/dx/           notes for importing the MyRx DX schema
+db/dx/           where the MyRx DX schema came from and what is still open
 scripts/         migrate and seed commands
 src/             API (Fastify + TypeScript)
-test/db/         database integrity tests
+test/db/         LIS database integrity tests
+test/dx/         MyRx DX database tests
 test/api/        API tests
 docs/            roadmap and decisions
 ```

@@ -15,4 +15,6 @@ Each one is enforced in the database where possible, with a test that proves it.
 | D8 | A retried DX order cannot create a duplicate LIS order. | Unique `(lab_id, source, external_ref)`; `test/db/tenancy.test.ts` |
 | D9 | Every change to patients, orders, tests, specimens, results, billing and reports is audited with the acting user, and the audit trail is append-only. | `lis.write_audit_event`, `trg_audit_append_only`; `test/db/audit.test.ts` |
 | D10 | Stack: PostgreSQL 16, Node.js 22 with TypeScript, Fastify, React for web screens; one modular monolith. | `package.json` |
+| D12 | DX assignment history is permanent: an attempt cannot be redirected, renumbered, deleted or reopened once closed. Reassignment is a new attempt. | `trg_dx_assignment_history`; `test/dx/assignment-lifecycle.test.ts` |
+| D13 | In DX, the lab's distribution decision for a report is an append-only log next to the immutable report version. DX only delivers a report while its latest decision is `authorised`; no decision means held. | `report_release_decisions`, `report_release_status`; `test/dx/release-decisions.test.ts` |
 | D11 | Applied migrations are never edited; changes go in a new numbered migration. | `scripts/migrate.ts` checksum check |
